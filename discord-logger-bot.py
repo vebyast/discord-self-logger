@@ -42,6 +42,10 @@ def user_nick_or_name(user):
 
 client = discord.Client()
 
+def write_log(filepath, text):
+    with open(filepath, 'a', encoding='utf8') as log_file:
+        log_file.write(text)
+
 @client.event
 async def on_ready():
     print('Logged in as')
@@ -59,9 +63,7 @@ async def on_message(message):
     # log everything else to the appropriate directory
     filepath = log_file_for_message(message)
     ensure_file_exists(filepath)
-
-    with open(filepath, 'a') as log_file:
-        log_file.write(format_message_for_log(message) + "\n")
+    write_log(filepath, format_message_for_log(message) + "\n")
 
 @client.event
 async def on_message_edit(message_before, message):
@@ -73,12 +75,11 @@ async def on_message_edit(message_before, message):
     filepath = log_file_for_message(message)
     ensure_file_exists(filepath)
 
-    with open(filepath, 'a') as log_file:
-        log_file.write("{0} Message edited:\n    {m_before}\n    {m_after}\n".format(
-            datetime.datetime.utcnow(),
-            m_before = format_message_for_log(message_before),
-            m_after = format_message_for_log(message),
-        ))
+    write_log(filepath, "{ts} Message edited:\n    {m_before}\n    {m_after}\n".format(
+        ts = datetime.datetime.utcnow(),
+        m_before = format_message_for_log(message_before),
+        m_after = format_message_for_log(message),
+    ))
 
 @client.event
 async def on_message_delete(message):
@@ -90,11 +91,10 @@ async def on_message_delete(message):
     filepath = log_file_for_message(message)
     ensure_file_exists(filepath)
 
-    with open(filepath, 'a') as log_file:
-        log_file.write("{0} Message deleted:\n    {m}\n".format(
-            datetime.datetime.utcnow(),
-            m = format_message_for_log(message)
-        ))
+    write_log(filepath, "{ts} Message deleted:\n    {m}\n".format(
+        ts = str(datetime.datetime.utcnow()),
+        m = format_message_for_log(message)
+    ))
 
 @client.event
 async def on_reaction_add(reaction, user):
@@ -105,13 +105,12 @@ async def on_reaction_add(reaction, user):
     # log everything else to the appropriate directory
     filepath = log_file_for_message(reaction.message)
     ensure_file_exists(filepath)
-    with open(filepath, 'a') as log_file:
-        log_file.write("{ts} {u} added reaction: {r}\n    {m}\n".format(
-            ts = datetime.datetime.utcnow(),
-            r = str(reaction.emoji),
-            u = user_nick_or_name(user),
-            m = format_message_for_log(reaction.message),
-        ))
+    write_log(filepath, "{ts} {u} added reaction: {r}\n    {m}\n".format(
+        ts = str(datetime.datetime.utcnow()),
+        r = str(reaction.emoji),
+        u = user_nick_or_name(user),
+        m = format_message_for_log(reaction.message),
+    ))
 
 @client.event
 async def on_reaction_remove(reaction, user):
@@ -122,13 +121,12 @@ async def on_reaction_remove(reaction, user):
     # log everything else to the appropriate directory
     filepath = log_file_for_message(reaction.message)
     ensure_file_exists(filepath)
-    with open(filepath, 'a') as log_file:
-        log_file.write("{ts} {u} removed reaction: {r}\n    {m}\n".format(
-            ts = datetime.datetime.utcnow(),
-            r = str(reaction.emoji),
-            u = user_nick_or_name(user),
-            m = format_message_for_log(reaction.message),
-        ))
+    write_log(filepath, "{ts} {u} removed reaction: {r}\n    {m}\n".format(
+        ts = str(datetime.datetime.utcnow()),
+        r = str(reaction.emoji),
+        u = user_nick_or_name(user),
+        m = format_message_for_log(reaction.message),
+    ))
 
 
 @client.event
@@ -142,8 +140,7 @@ async def on_member_update(member_before, member):
         for channel in member.server.channels:
             filepath = log_file_for_channel(channel)
             ensure_file_exists(filepath)
-            with open(filepath, 'a') as log_file:
-                log_file.write(text)
+            write_log(filepath, text)
 
     if member.nick and not member_before.nick:
         log_on_all_channels("{ts} {u} got a nick: '{after}'\n".format(
