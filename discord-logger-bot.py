@@ -1,50 +1,9 @@
 import discord
-import os
-import datetime
-import sys
-import unicodedata
-import re
-import getpass
+import vebyastdiscordlogger.logsaver as logsaver
+import vebyastdiscordlogger.auth as discord_auth
 
-def slugify(value):
-    value = str(value)
-    value = unicodedata.normalize('NFKC', value)
-    value = re.sub(slugify.non_word_reg, '', value).strip().lower()
-    value = re.sub(slugify.collapse_space_reg, '-', value)
-    return value
-slugify.non_word_reg = re.compile(r'[^\w\s-]')
-slugify.collapse_space_reg = re.compile(r'[^\w\s-]')
-
-def log_dir_for_server(server):
-    return os.path.join(slugify(server.name))
-
-def log_file_for_channel(channel):
-    return os.path.join(log_dir_for_server(channel.server), slugify(channel.name))
-
-def log_file_for_message(message):
-    return log_file_for_channel(message.channel)
-
-def ensure_file_exists(filepath):
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-
-def format_message_for_log(message):
-    return "{0} {1}: {2}".format(
-        message.edited_timestamp or message.timestamp,
-        user_nick_or_name(message.author),
-        message.clean_content,
-    )
-
-def user_nick_or_name(user):
-    if hasattr(user, 'nick'):
-        return user.nick or user.name
-    else:
-        return user.name
 
 client = discord.Client()
-
-def write_log(filepath, text):
-    with open(filepath, 'a', encoding='utf8') as log_file:
-        log_file.write(text)
 
 @client.event
 async def on_ready():
@@ -61,9 +20,9 @@ async def on_message(message):
         return
 
     # log everything else to the appropriate directory
-    filepath = log_file_for_message(message)
-    ensure_file_exists(filepath)
-    write_log(filepath, format_message_for_log(message) + "\n")
+    filepath = logsaver.log_file_for_message(message)
+    logsaver.ensure_file_exists(filepath)
+    logsaver.write_log(filepath, logsaver.format_message_for_log(message) + "\n", suppress_ts = True)
 
 @client.event
 async def on_message_edit(message_before, message):
@@ -72,13 +31,12 @@ async def on_message_edit(message_before, message):
         return
 
     # log everything else to the appropriate directory
-    filepath = log_file_for_message(message)
-    ensure_file_exists(filepath)
+    filepath = logsaver.log_file_for_message(message)
+    logsaver.ensure_file_exists(filepath)
 
-    write_log(filepath, "{ts} Message edited:\n    {m_before}\n    {m_after}\n".format(
-        ts = datetime.datetime.utcnow(),
-        m_before = format_message_for_log(message_before),
-        m_after = format_message_for_log(message),
+    logsaver.write_log(filepath, "Message edited:\n    {m_before}\n    {m_after}\n".format(
+        m_before = logsaver.format_message_for_log(message_before),
+        m_after = logsaver.format_message_for_log(message),
     ))
 
 @client.event
@@ -88,12 +46,11 @@ async def on_message_delete(message):
         return
 
     # log everything else to the appropriate directory
-    filepath = log_file_for_message(message)
-    ensure_file_exists(filepath)
+    filepath = logsaver.log_file_for_message(message)
+    logsaver.ensure_file_exists(filepath)
 
-    write_log(filepath, "{ts} Message deleted:\n    {m}\n".format(
-        ts = str(datetime.datetime.utcnow()),
-        m = format_message_for_log(message)
+    logsaver.write_log(filepath, "Message deleted:\n    {m}\n".format(
+        m = logsaver.format_message_for_log(message)
     ))
 
 @client.event
@@ -103,13 +60,12 @@ async def on_reaction_add(reaction, user):
         return
 
     # log everything else to the appropriate directory
-    filepath = log_file_for_message(reaction.message)
-    ensure_file_exists(filepath)
-    write_log(filepath, "{ts} {u} added reaction: {r}\n    {m}\n".format(
-        ts = str(datetime.datetime.utcnow()),
+    filepath = logsaver.log_file_for_message(reaction.message)
+    logsaver.ensure_file_exists(filepath)
+    logsaver.write_log(filepath, "{u} added reaction: {r}\n    {m}\n".format(
         r = str(reaction.emoji),
-        u = user_nick_or_name(user),
-        m = format_message_for_log(reaction.message),
+        u = logsaver.user_nick_or_name(user),
+        m = logsaver.format_message_for_log(reaction.message),
     ))
 
 @client.event
@@ -119,13 +75,12 @@ async def on_reaction_remove(reaction, user):
         return
 
     # log everything else to the appropriate directory
-    filepath = log_file_for_message(reaction.message)
-    ensure_file_exists(filepath)
-    write_log(filepath, "{ts} {u} removed reaction: {r}\n    {m}\n".format(
-        ts = str(datetime.datetime.utcnow()),
+    filepath = logsaver.log_file_for_message(reaction.message)
+    logsaver.ensure_file_exists(filepath)
+    logsaver.write_log(filepath, "{u} removed reaction: {r}\n    {m}\n".format(
         r = str(reaction.emoji),
-        u = user_nick_or_name(user),
-        m = format_message_for_log(reaction.message),
+        u = logsaver.user_nick_or_name(user),
+        m = logsaver.format_message_for_log(reaction.message),
     ))
 
 
@@ -138,25 +93,22 @@ async def on_member_update(member_before, member):
     def log_on_all_channels(text):
         # log everything else to the appropriate directory
         for channel in member.server.channels:
-            filepath = log_file_for_channel(channel)
-            ensure_file_exists(filepath)
-            write_log(filepath, text)
+            filepath = logsaver.log_file_for_channel(channel)
+            logsaver.ensure_file_exists(filepath)
+            logsaver.write_log(filepath, text)
 
     if member.nick and not member_before.nick:
-        log_on_all_channels("{ts} {u} got a nick: '{after}'\n".format(
-            ts = datetime.datetime.utcnow(),
+        log_on_all_channels("{u} got a nick: '{after}'\n".format(
             u = member.name,
             after = member.nick,
         ))
     elif member_before.nick and not member.nick:
-        log_on_all_channels("{ts} {u} cleared their nick (was '{before}')\n".format(
-            ts = datetime.datetime.utcnow(),
+        log_on_all_channels("{u} cleared their nick (was '{before}')\n".format(
             u = member.name,
             before = member_before.nick,
         ))
     elif member.nick != member_before.nick:
-        log_on_all_channels("{ts} {u} changed nick from '{before}' to '{after}'\n".format(
-            ts = datetime.datetime.utcnow(),
+        log_on_all_channels("{u} changed nick from '{before}' to '{after}'\n".format(
             u = member.name,
             before = member_before.nick,
             after = member.nick
@@ -165,48 +117,25 @@ async def on_member_update(member_before, member):
     new_roles = set(member.roles) - set(member_before.roles)
     old_roles = set(member_before.roles) - set(member.roles)
     if new_roles:
-        log_on_all_channels("{ts} {u} was given roles: {r}\n".format(
-            ts = datetime.datetime.utcnow(),
-            u = member.nick or member.name,
+        log_on_all_channels("{u} was given roles: {r}\n".format(
+            u = logsaver.user_nick_or_name(member),
             r = ', '.join(str(r) for r in new_roles),
         ))
 
     if old_roles:
-        log_on_all_channels("{ts} {u} lost roles: {r}\n".format(
-            ts = datetime.datetime.utcnow(),
-            u = member.nick or member.name,
+        log_on_all_channels("{u} lost roles: {r}\n".format(
+            u = logsaver.user_nick_or_name(member),
             r = ', '.join(str(r) for r in old_roles),
         ))
 
     # if member.status != member_before.status:
-    #     log_on_all_channels("{ts} {u} changed status from '{before}' to '{after}'\n".format(
-    #         ts = datetime.datetime.utcnow(),
+    #     log_on_all_channels("{u} changed status from '{before}' to '{after}'\n".format(
     #         u = member.name,
     #         before = member_before.status,
     #         after = member.status,
     #     ))
 
 
-discord_token = None
-discord_uname = None
-discord_pass = None
+discord_auth_args = discord_auth.get_discord_auth_args()
 
-if 'DISCORD_TOKEN' in os.environ:
-    discord_token = os.environ['DISCORD_TOKEN']
-
-if os.path.exists('discord_token.txt'):
-    with open('discord_token.txt', 'r') as token_file:
-        discord_token = token_file.read().strip()
-
-if not discord_token:
-    discord_uname = input("Discord account email: ")
-    discord_pass = getpass.getpass()
-
-if not discord_token and not (discord_uname and discord_pass):
-    print('Need to set the discord token. This can be done with the DISCORD_TOKEN environment variable, by creating a file "discord_token.txt", or by typing in your username and password when prompted.', file=sys.stderr)
-    sys.exit(-1)
-
-if discord_token:
-    client.run(discord_token, bot=False)
-else:
-    client.run(discord_uname, discord_pass, bot=False)
+client.run(*discord_auth_args, bot=False)
