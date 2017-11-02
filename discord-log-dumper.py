@@ -52,6 +52,7 @@ async def on_ready():
     channel = await get_channel(channel_id)
 
     log_filepath = logsaver.log_file_for_channel(channel)
+    logsaver.ensure_file_exists(log_filepath)
 
     logsaver.write_log(
         filepath = log_filepath,
